@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "kind": "lazy100.gamesCatalog",
+  "name": "LAZY-100 Games",
+  "repository": "https://github.com/zzxzzk115/Lazy-100-games",
+  "games": [
+    {
+      "id": "breakout",
+      "name": "Breakout",
+      "author": "Lazy_V",
+      "description": "Classic brick-breaking arcade game: paddle, ball, and five rows of rainbow bricks.",
+      "version": "1.0.0",
+      "category": "arcade",
+      "tags": ["classic", "arcade", "paddle"],
+      "license": "MIT",
+      "repository": "https://github.com/zzxzzk115/Lazy-100",
+      "cart": "games/breakout/breakout.lz100",
+      "preview": "games/breakout/preview.png"
+    }
+  ]
+}
