@@ -9,7 +9,7 @@
       "name": "Breakout",
       "author": "Lazy_V",
       "description": "Classic brick-breaking arcade game: paddle, ball, and five rows of rainbow bricks.",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "category": "arcade",
       "tags": ["classic", "arcade", "paddle"],
       "license": "MIT",
