@@ -13,7 +13,7 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "name", "author", "version", "category", "cart", "preview"],
+        "required": ["id", "name", "author", "version", "category", "cart"],
         "properties": {
           "id": {
             "type": "string",
@@ -35,15 +35,21 @@
           "tags": { "type": "array", "items": { "type": "string" } },
           "license": { "type": "string", "description": "SPDX license id of the game itself." },
           "repository": { "type": "string", "description": "The game's own source repository, if any. May be empty." },
+          "featured": { "type": "boolean", "description": "Show on the site's home page." },
           "cart": {
             "type": "string",
+            "pattern": "^games/[a-z0-9][a-z0-9_-]*/[a-z0-9][a-z0-9_-]*\\.lz100\\.png$",
+            "description": "Repo-relative path to the PNG cartridge (.lz100.png): a playable cart whose visible cover doubles as the preview image. Required."
+          },
+          "source": {
+            "type": "string",
             "pattern": "^games/[a-z0-9][a-z0-9_-]*/[a-z0-9][a-z0-9_-]*\\.lz100$",
-            "description": "Repo-relative path to the .lz100 cart. Only .lz100 is accepted (no PNG carts)."
+            "description": "Optional repo-relative path to the plain-text .lz100 cart, provided for human code review."
           },
           "preview": {
             "type": "string",
-            "pattern": "^games/[a-z0-9][a-z0-9_-]*/preview\\.png$",
-            "description": "Repo-relative path to the 320x240 first-frame preview PNG."
+            "pattern": "^games/[a-z0-9][a-z0-9_-]*/[a-z0-9][a-z0-9_-]*\\.png$",
+            "description": "Optional distinct preview PNG. Omit to use the cart's own cover image."
           }
         },
         "additionalProperties": false
