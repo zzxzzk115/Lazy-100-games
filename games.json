@@ -17,6 +17,20 @@
       "featured": true,
       "cart": "games/breakout/breakout.lz100.png",
       "source": "games/breakout/breakout.lz100"
+    },
+    {
+      "id": "lazybird",
+      "name": "Lazy Bird",
+      "author": "Lazy_V",
+      "description": "One-button flappy homage: tap to flap, thread the pipes, chase your best score.",
+      "version": "1.0.0",
+      "category": "arcade",
+      "tags": ["arcade", "one-button", "endless"],
+      "license": "MIT",
+      "repository": "https://github.com/zzxzzk115/Lazy-100",
+      "featured": true,
+      "cart": "games/lazybird/lazybird.lz100.png",
+      "source": "games/lazybird/lazybird.lz100"
     }
   ]
 }
