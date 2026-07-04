@@ -29,6 +29,7 @@ jobs:
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
         run: |
           set -e
           files=$(git diff --name-only --diff-filter=AM "$BASE" "$HEAD" -- '*.lz100.png' || true)
@@ -38,6 +39,12 @@ jobs:
             echo ""
             if [ -z "$files" ]; then echo "_No \`.lz100.png\` files changed._"; fi
             for f in $files; do
+              # Playable preview: the online console fetches the PR's cart straight from the
+              # fork's raw URL (?cart_url= is locked to raw.githubusercontent.com site-side).
+              raw="https://raw.githubusercontent.com/$HEAD_REPO/$HEAD/$f"
+              play="https://zzxzzk115.github.io/Lazy-100/?cart_url=$(python3 -c 'import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1], safe=""))' "$raw")"
+              echo "▶ **[Play \`$f\` in the browser]($play)**"
+              echo ""
               echo "<details><summary><code>$f</code></summary>"
               echo ""
               echo '```lua'
