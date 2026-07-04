@@ -41,7 +41,7 @@
       "category": "arcade",
       "tags": ["classic", "arcade", "snake"],
       "license": "MIT",
-      "featured": false,
+      "featured": true,
       "cart": "games/snake/snake.lz100.png",
       "source": "games/snake/snake.lz100"
     }
