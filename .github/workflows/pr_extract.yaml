@@ -79,11 +79,11 @@ jobs:
           PY
           cat > same_cart.py <<'PY'
           import sys
+          # Whitespace-tolerant: trailing spaces and blank lines don't make a cart "different"
+          # (editors add/drop them freely); only real content divergence should warn.
           def norm(p):
               lines = [l.rstrip() for l in open(p, encoding="utf-8", errors="replace").read().split("\n")]
-              while lines and not lines[-1]:
-                  lines.pop()
-              return lines
+              return [l for l in lines if l]
           sys.exit(0 if norm(sys.argv[1]) == norm(sys.argv[2]) else 1)
           PY
 
