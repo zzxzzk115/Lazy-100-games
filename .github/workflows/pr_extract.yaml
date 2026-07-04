@@ -1,12 +1,13 @@
 name: Extract cart source
 
-# When a PR adds/updates a .lz100.png cartridge, decode the source hidden inside it and post it
-# as a code block on the PR, so reviewers can read the real cart without the console.
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize, reopened]
-    paths: ["games/**/*.lz100.png"]
+    paths:
+      - "games/**/*.lz100.png"
 
+# NOTE: commenting on a PR goes through the *issues* REST endpoint, but the token permission
+# GitHub checks for it is pull-requests: write (issues: write only covers real issues).
 permissions:
   contents: read
   pull-requests: write
@@ -14,60 +15,125 @@ permissions:
 jobs:
   extract:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha }}
 
-      - uses: actions/setup-python@v5
+    steps:
+      # Checkout trusted base repo only. Do NOT execute code from the fork.
+      - name: Checkout base repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.x"
-      - run: pip install Pillow
 
-      - name: Decode changed cart PNGs
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip Pillow
+
+      - name: Get changed cart files
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs');
+
+            const { owner, repo } = context.repo;
+            const pull_number = context.payload.pull_request.number;
+
+            const files = await github.paginate(
+              github.rest.pulls.listFiles,
+              { owner, repo, pull_number, per_page: 100 }
+            );
+
+            const carts = files
+              .filter(f =>
+                ['added', 'modified'].includes(f.status) &&
+                f.filename.startsWith('games/') &&
+                f.filename.endsWith('.lz100.png')
+              )
+              .map(f => f.filename);
+
+            fs.writeFileSync('changed_carts.txt', carts.join('\n'));
+
+      - name: Download and decode changed cart PNGs
         env:
-          BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
           HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
         run: |
-          set -e
-          files=$(git diff --name-only --diff-filter=AM "$BASE" "$HEAD" -- '*.lz100.png' || true)
+          set -euo pipefail
+
           {
             echo "<!-- lz100-extract -->"
             echo "🤖 **Cart source extracted from the PNG cartridge(s)** — for review (code section only)."
             echo ""
-            if [ -z "$files" ]; then echo "_No \`.lz100.png\` files changed._"; fi
-            for f in $files; do
-              # Playable preview: the online console fetches the PR's cart straight from the
-              # fork's raw URL (?cart_url= is locked to raw.githubusercontent.com site-side).
+
+            if [ ! -s changed_carts.txt ]; then
+              echo "_No \`.lz100.png\` files changed._"
+            fi
+
+            while IFS= read -r f || [ -n "$f" ]; do
+              [ -n "$f" ] || continue
+
+              mkdir -p "pr_files/$(dirname "$f")"
+
               raw="https://raw.githubusercontent.com/$HEAD_REPO/$HEAD/$f"
+              local_file="pr_files/$f"
+
+              curl -fsSL "$raw" -o "$local_file"
+
               play="https://zzxzzk115.github.io/Lazy-100/?cart_url=$(python3 -c 'import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1], safe=""))' "$raw")"
+
               echo "▶ **[Play \`$f\` in the browser]($play)**"
               echo ""
               echo "<details><summary><code>$f</code></summary>"
               echo ""
               echo '```lua'
-              # header + __lua__ code, stopping before the binary gfx/map/sfx/music/label sections
-              python3 scripts/lz100png_decode.py "$f" 2>/dev/null \
+
+              python3 scripts/lz100png_decode.py "$local_file" 2>/dev/null \
                 | awk 'BEGIN{s=1} /^__(gfx|gff|map|sfx|music|label)__$/{s=0} s' \
-                | head -c 55000
+                | head -c 55000 || true
+
               echo ""
               echo '```'
               echo "</details>"
               echo ""
-            done
+            done < changed_carts.txt
+          # NOTE: the `|| [ -n "$f" ]` in the loop guard matters: changed_carts.txt is written
+          # without a trailing newline, and a bare `read` drops that final unterminated line -
+          # a single-cart PR would otherwise produce an empty comment.
           } > comment.md
 
-      - uses: actions/github-script@v7
+      - name: Create or update PR comment
+        uses: actions/github-script@v8
         with:
           script: |
             const fs = require('fs');
+
             const body = fs.readFileSync('comment.md', 'utf8');
             const marker = '<!-- lz100-extract -->';
+
             const { owner, repo } = context.repo;
             const issue_number = context.payload.pull_request.number;
-            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });
+
+            const comments = await github.paginate(
+              github.rest.issues.listComments,
+              { owner, repo, issue_number, per_page: 100 }
+            );
+
             const existing = comments.find(c => c.body && c.body.includes(marker));
-            if (existing) await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
-            else await github.rest.issues.createComment({ owner, repo, issue_number, body });
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body
+              });
+            }
