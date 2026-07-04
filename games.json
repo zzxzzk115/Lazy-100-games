@@ -31,6 +31,19 @@
       "featured": true,
       "cart": "games/lazybird/lazybird.lz100.png",
       "source": "games/lazybird/lazybird.lz100"
+    },
+    {
+      "id": "snake",
+      "name": "Snake",
+      "author": "MickeyMiao",
+      "description": "Classic snake game: eat food, grow longer, avoid walls and yourself.",
+      "version": "1.0.0",
+      "category": "arcade",
+      "tags": ["classic", "arcade", "snake"],
+      "license": "MIT",
+      "featured": false,
+      "cart": "games/snake/snake.lz100.png",
+      "source": "games/snake/snake.lz100"
     }
   ]
 }
