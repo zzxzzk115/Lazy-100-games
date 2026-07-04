@@ -62,45 +62,102 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Helper scripts (run against PR DATA only; the code executing them is from base).
+          cat > meta_row.py <<'PY'
+          import json, sys
+          try:
+              j = json.load(open("pr_games.json", encoding="utf-8"))
+              for g in j.get("games", []):
+                  if g.get("cart") == sys.argv[1]:
+                      tags = ", ".join(g.get("tags", []))
+                      print("| `%s` | %s | %s | %s | %s |" % (
+                          g.get("id", "?"), g.get("version", "?"),
+                          g.get("category", "?"), tags, g.get("license", "?")))
+                      break
+          except Exception:
+              pass
+          PY
+          cat > same_cart.py <<'PY'
+          import sys
+          def norm(p):
+              lines = [l.rstrip() for l in open(p, encoding="utf-8", errors="replace").read().split("\n")]
+              while lines and not lines[-1]:
+                  lines.pop()
+              return lines
+          sys.exit(0 if norm(sys.argv[1]) == norm(sys.argv[2]) else 1)
+          PY
+
+          # The PR's games.json (data): used to show id/version/category metadata.
+          curl -fsSL "https://raw.githubusercontent.com/$HEAD_REPO/$HEAD/games.json" -o pr_games.json \
+            || echo '{"games":[]}' > pr_games.json
+
           {
             echo "<!-- lz100-extract -->"
-            echo "🤖 **Cart source extracted from the PNG cartridge(s)** — for review (code section only)."
+            echo "🤖 **Cart check** — decoded from the PNG cartridge(s) for review."
             echo ""
 
             if [ ! -s changed_carts.txt ]; then
               echo "_No \`.lz100.png\` files changed._"
             fi
 
+            # `|| [ -n "$f" ]`: changed_carts.txt has no trailing newline; a bare `read`
+            # would drop the final line and a single-cart PR would produce an empty comment.
             while IFS= read -r f || [ -n "$f" ]; do
               [ -n "$f" ] || continue
 
               mkdir -p "pr_files/$(dirname "$f")"
-
               raw="https://raw.githubusercontent.com/$HEAD_REPO/$HEAD/$f"
               local_file="pr_files/$f"
-
               curl -fsSL "$raw" -o "$local_file"
 
-              play="https://zzxzzk115.github.io/Lazy-100/?cart_url=$(python3 -c 'import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1], safe=""))' "$raw")"
+              dec="$local_file.decoded.txt"
+              python3 scripts/lz100png_decode.py "$local_file" > "$dec" 2>/dev/null || : > "$dec"
 
-              echo "▶ **[Play \`$f\` in the browser]($play)**"
+              # -- metadata: title/author from the cart header, the rest from games.json --
+              title=$(sed -n 's/^title //p'  "$dec" | head -1)
+              author=$(sed -n 's/^author //p' "$dec" | head -1)
+              echo "### 🕹 ${title:-$(basename "$f")}${author:+ — by $author}"
               echo ""
-              echo "<details><summary><code>$f</code></summary>"
+              echo "<img src=\"$raw\" width=\"264\" alt=\"cartridge\">"
+              echo ""
+              meta=$(python3 meta_row.py "$f")
+              if [ -n "$meta" ]; then
+                echo "| id | version | category | tags | license |"
+                echo "|---|---|---|---|---|"
+                echo "$meta"
+              else
+                echo "⚠️ _no matching \`games.json\` entry for \`$f\` (cart path must match the entry's \`cart\` field)._"
+              fi
+              echo ""
+
+              play="https://zzxzzk115.github.io/Lazy-100/?cart_url=$(python3 -c 'import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1], safe=""))' "$raw")"
+              echo "▶ **[Play it in the browser]($play)**"
+              echo ""
+
+              # -- consistency: does the uploaded .lz100 match what's inside the PNG? --
+              src="${f%.png}"
+              src_local="pr_files/$src"
+              if curl -fsSL "https://raw.githubusercontent.com/$HEAD_REPO/$HEAD/$src" -o "$src_local" 2>/dev/null; then
+                if python3 same_cart.py "$dec" "$src_local"; then
+                  echo "✅ \`$(basename "$src")\` matches the cartridge contents."
+                else
+                  echo "⚠️ **WARNING: \`$(basename "$src")\` does NOT match what is inside \`$(basename "$f")\`.**"
+                  echo "The PNG cartridge is what players run — please re-export so both agree."
+                fi
+              else
+                echo "_ℹ no \`.lz100\` source uploaded (optional; the code below is decoded from the PNG)._"
+              fi
+              echo ""
+
+              echo "<details><summary>cart source: <code>$f</code></summary>"
               echo ""
               echo '```lua'
-
-              python3 scripts/lz100png_decode.py "$local_file" 2>/dev/null \
-                | awk 'BEGIN{s=1} /^__(gfx|gff|map|sfx|music|label)__$/{s=0} s' \
-                | head -c 55000 || true
-
+              awk 'BEGIN{s=1} /^__(gfx|gff|map|sfx|music|label)__$/{s=0} s' "$dec" | head -c 55000 || true
               echo ""
               echo '```'
               echo "</details>"
               echo ""
             done < changed_carts.txt
-          # NOTE: the `|| [ -n "$f" ]` in the loop guard matters: changed_carts.txt is written
-          # without a trailing newline, and a bare `read` drops that final unterminated line -
-          # a single-cart PR would otherwise produce an empty comment.
           } > comment.md
 
       - name: Create or update PR comment
