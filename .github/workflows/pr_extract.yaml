@@ -81,8 +81,12 @@ jobs:
           import sys
           # Whitespace-tolerant: trailing spaces and blank lines don't make a cart "different"
           # (editors add/drop them freely); only real content divergence should warn.
+          # The __label__ section (last in the file) is stripped too: it is the screenshot
+          # cartshot generates at PNG pack time and legitimately absent from .lz100 sources.
           def norm(p):
-              lines = [l.rstrip() for l in open(p, encoding="utf-8", errors="replace").read().split("\n")]
+              txt = open(p, encoding="utf-8", errors="replace").read()
+              txt = txt.split("\n__label__\n")[0]
+              lines = [l.rstrip() for l in txt.split("\n")]
               return [l for l in lines if l]
           sys.exit(0 if norm(sys.argv[1]) == norm(sys.argv[2]) else 1)
           PY
